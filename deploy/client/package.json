@@ -1,0 +1,30 @@
+{
+  "name": "@better-auth-deploy/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-auth": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "viem": "^2.57.4",
+    "@better-auth/oauth-provider": "workspace:*",
+    "@metamask/connect-evm": "^2.1.1",
+    "qrcode.react": "^4.2.0",
+    "@metamask/mobile-wallet-protocol-core": "^0.4.0",
+    "eciesjs": "^0.4.17"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^6.0.3",
+    "vite": "^6.4.0"
+  }
+}

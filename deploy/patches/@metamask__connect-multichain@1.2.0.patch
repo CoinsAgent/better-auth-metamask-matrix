@@ -1,0 +1,412 @@
+diff --git a/dist/browser/es/connect-multichain.mjs b/dist/browser/es/connect-multichain.mjs
+--- a/dist/browser/es/connect-multichain.mjs
++++ b/dist/browser/es/connect-multichain.mjs
+@@ -1211,7 +1211,7 @@
+     init_constants2();
+     DEFAULT_REQUEST_TIMEOUT2 = 60 * 1e3;
+     CONNECTION_GRACE_PERIOD = 60 * 1e3;
+-    DEFAULT_CONNECTION_TIMEOUT = DEFAULT_REQUEST_TIMEOUT2 + CONNECTION_GRACE_PERIOD;
++    DEFAULT_CONNECTION_TIMEOUT = 5 * 60 * 1e3 + CONNECTION_GRACE_PERIOD;
+     DEFAULT_RESUME_TIMEOUT = 10 * 1e3;
+     SESSION_STORE_KEY = "cache_wallet_getSession";
+     ACCOUNTS_STORE_KEY = "cache_eth_accounts";
+@@ -1441,9 +1441,7 @@
+           return connection.catch((error) => __async(this, null, function* () {
+             yield this.dappClient.disconnect();
+             throw error;
+-          })).finally(() => {
+-            this.removeStoredPendingSessionRequest();
+-          });
++          })).finally(() => this.removeStoredPendingSessionRequest());
+         });
+       }
+       /**
+@@ -1465,17 +1463,18 @@
+               ([key]) => remainingScopes.includes(key)
+             )
+           );
+-          this.request({ method: "wallet_revokeSession", params: { scopes } }).catch(
+-            (err) => {
+-              console.error("error revoking session", err);
++          if (Object.keys(cachedSessionScopes).length > 0) {
++            const response = yield this.request({ method: "wallet_revokeSession", params: { scopes } });
++            if (response.error || response.result !== true) {
++              throw new Error(response.error?.message || "Wallet did not acknowledge session revocation");
+             }
+-          );
++          }
+           const remainingScopesIncludeEip155 = remainingScopes.some(
+             (scope) => scope.includes("eip155")
+           );
+           if (!remainingScopesIncludeEip155) {
+-            this.kvstore.delete(ACCOUNTS_STORE_KEY);
+-            this.kvstore.delete(CHAIN_STORE_KEY);
++            yield this.kvstore.delete(ACCOUNTS_STORE_KEY);
++            yield this.kvstore.delete(CHAIN_STORE_KEY);
+           }
+           if (remainingScopes.length > 0) {
+             this.kvstore.set(
+@@ -1487,13 +1486,14 @@
+               })
+             );
+           } else {
+-            this.kvstore.delete(SESSION_STORE_KEY);
++            yield this.kvstore.delete(SESSION_STORE_KEY);
+             if (typeof window !== "undefined" && typeof window.removeEventListener !== "undefined" && this.windowFocusHandler) {
+               window.removeEventListener("focus", this.windowFocusHandler);
+               this.windowFocusHandler = void 0;
+             }
+             yield this.dappClient.disconnect();
+           }
++          yield this.removeStoredPendingSessionRequest();
+           this.notifyCallbacks({
+             method: "wallet_sessionChanged",
+             params: {
+@@ -1582,7 +1582,7 @@
+       }
+       storeWalletSession(request, response) {
+         return __async(this, null, function* () {
+-          if (response.error) {
++          if (response.error || (CACHED_RESET_METHOD_LIST.includes(request.method) && response.result !== true)) {
+             return;
+           }
+           if (CACHED_METHOD_LIST.includes(request.method)) {
+@@ -3755,8 +3755,9 @@
+ };
+ headlessConnect_fn = function(scopes, caipAccountIds, sessionProperties) {
+   return __async(this, null, function* () {
+-    if (this.dappClient.state === "CONNECTED" || this.dappClient.state === "CONNECTING") {
+-      yield this.dappClient.disconnect().catch(() => void 0);
++    const dappClient = this.dappClient;
++    if (dappClient.state === "CONNECTED" || dappClient.state === "CONNECTING") {
++      yield dappClient.disconnect().catch(() => void 0);
+     }
+     const onSessionRequest = (sessionRequest) => {
+       const connectionRequest = {
+@@ -3766,7 +3767,7 @@
+       const deeplink = this.options.ui.factory.createConnectionDeeplink(connectionRequest);
+       this.emit("display_uri", deeplink);
+     };
+-    this.dappClient.on("session_request", onSessionRequest);
++    dappClient.on("session_request", onSessionRequest);
+     try {
+       yield __privateMethod(this, _MetaMaskConnectMultichain_instances, transportOrThrow_fn).call(this).connect({
+         scopes,
+@@ -3784,7 +3785,7 @@
+       }
+       throw new Error(String(error));
+     } finally {
+-      this.dappClient.off("session_request", onSessionRequest);
++      dappClient.off("session_request", onSessionRequest);
+     }
+   });
+ };
+diff --git a/dist/node/es/connect-multichain.mjs b/dist/node/es/connect-multichain.mjs
+--- a/dist/node/es/connect-multichain.mjs
++++ b/dist/node/es/connect-multichain.mjs
+@@ -1211,7 +1211,7 @@
+     init_constants2();
+     DEFAULT_REQUEST_TIMEOUT2 = 60 * 1e3;
+     CONNECTION_GRACE_PERIOD = 60 * 1e3;
+-    DEFAULT_CONNECTION_TIMEOUT = DEFAULT_REQUEST_TIMEOUT2 + CONNECTION_GRACE_PERIOD;
++    DEFAULT_CONNECTION_TIMEOUT = 5 * 60 * 1e3 + CONNECTION_GRACE_PERIOD;
+     DEFAULT_RESUME_TIMEOUT = 10 * 1e3;
+     SESSION_STORE_KEY = "cache_wallet_getSession";
+     ACCOUNTS_STORE_KEY = "cache_eth_accounts";
+@@ -1441,9 +1441,7 @@
+           return connection.catch((error) => __async(this, null, function* () {
+             yield this.dappClient.disconnect();
+             throw error;
+-          })).finally(() => {
+-            this.removeStoredPendingSessionRequest();
+-          });
++          })).finally(() => this.removeStoredPendingSessionRequest());
+         });
+       }
+       /**
+@@ -1465,17 +1463,18 @@
+               ([key]) => remainingScopes.includes(key)
+             )
+           );
+-          this.request({ method: "wallet_revokeSession", params: { scopes } }).catch(
+-            (err) => {
+-              console.error("error revoking session", err);
++          if (Object.keys(cachedSessionScopes).length > 0) {
++            const response = yield this.request({ method: "wallet_revokeSession", params: { scopes } });
++            if (response.error || response.result !== true) {
++              throw new Error(response.error?.message || "Wallet did not acknowledge session revocation");
+             }
+-          );
++          }
+           const remainingScopesIncludeEip155 = remainingScopes.some(
+             (scope) => scope.includes("eip155")
+           );
+           if (!remainingScopesIncludeEip155) {
+-            this.kvstore.delete(ACCOUNTS_STORE_KEY);
+-            this.kvstore.delete(CHAIN_STORE_KEY);
++            yield this.kvstore.delete(ACCOUNTS_STORE_KEY);
++            yield this.kvstore.delete(CHAIN_STORE_KEY);
+           }
+           if (remainingScopes.length > 0) {
+             this.kvstore.set(
+@@ -1487,13 +1486,14 @@
+               })
+             );
+           } else {
+-            this.kvstore.delete(SESSION_STORE_KEY);
++            yield this.kvstore.delete(SESSION_STORE_KEY);
+             if (typeof window !== "undefined" && typeof window.removeEventListener !== "undefined" && this.windowFocusHandler) {
+               window.removeEventListener("focus", this.windowFocusHandler);
+               this.windowFocusHandler = void 0;
+             }
+             yield this.dappClient.disconnect();
+           }
++          yield this.removeStoredPendingSessionRequest();
+           this.notifyCallbacks({
+             method: "wallet_sessionChanged",
+             params: {
+@@ -1582,7 +1582,7 @@
+       }
+       storeWalletSession(request, response) {
+         return __async(this, null, function* () {
+-          if (response.error) {
++          if (response.error || (CACHED_RESET_METHOD_LIST.includes(request.method) && response.result !== true)) {
+             return;
+           }
+           if (CACHED_METHOD_LIST.includes(request.method)) {
+@@ -3696,8 +3696,9 @@
+ };
+ headlessConnect_fn = function(scopes, caipAccountIds, sessionProperties) {
+   return __async(this, null, function* () {
+-    if (this.dappClient.state === "CONNECTED" || this.dappClient.state === "CONNECTING") {
+-      yield this.dappClient.disconnect().catch(() => void 0);
++    const dappClient = this.dappClient;
++    if (dappClient.state === "CONNECTED" || dappClient.state === "CONNECTING") {
++      yield dappClient.disconnect().catch(() => void 0);
+     }
+     const onSessionRequest = (sessionRequest) => {
+       const connectionRequest = {
+@@ -3707,7 +3708,7 @@
+       const deeplink = this.options.ui.factory.createConnectionDeeplink(connectionRequest);
+       this.emit("display_uri", deeplink);
+     };
+-    this.dappClient.on("session_request", onSessionRequest);
++    dappClient.on("session_request", onSessionRequest);
+     try {
+       yield __privateMethod(this, _MetaMaskConnectMultichain_instances, transportOrThrow_fn).call(this).connect({
+         scopes,
+@@ -3725,7 +3726,7 @@
+       }
+       throw new Error(String(error));
+     } finally {
+-      this.dappClient.off("session_request", onSessionRequest);
++      dappClient.off("session_request", onSessionRequest);
+     }
+   });
+ };
+diff --git a/dist/node/cjs/connect-multichain.js b/dist/node/cjs/connect-multichain.js
+--- a/dist/node/cjs/connect-multichain.js
++++ b/dist/node/cjs/connect-multichain.js
+@@ -1227,7 +1227,7 @@
+     init_constants2();
+     DEFAULT_REQUEST_TIMEOUT2 = 60 * 1e3;
+     CONNECTION_GRACE_PERIOD = 60 * 1e3;
+-    DEFAULT_CONNECTION_TIMEOUT = DEFAULT_REQUEST_TIMEOUT2 + CONNECTION_GRACE_PERIOD;
++    DEFAULT_CONNECTION_TIMEOUT = 5 * 60 * 1e3 + CONNECTION_GRACE_PERIOD;
+     DEFAULT_RESUME_TIMEOUT = 10 * 1e3;
+     SESSION_STORE_KEY = "cache_wallet_getSession";
+     ACCOUNTS_STORE_KEY = "cache_eth_accounts";
+@@ -1457,9 +1457,7 @@
+           return connection.catch((error) => __async(this, null, function* () {
+             yield this.dappClient.disconnect();
+             throw error;
+-          })).finally(() => {
+-            this.removeStoredPendingSessionRequest();
+-          });
++          })).finally(() => this.removeStoredPendingSessionRequest());
+         });
+       }
+       /**
+@@ -1481,17 +1479,18 @@
+               ([key]) => remainingScopes.includes(key)
+             )
+           );
+-          this.request({ method: "wallet_revokeSession", params: { scopes } }).catch(
+-            (err) => {
+-              console.error("error revoking session", err);
++          if (Object.keys(cachedSessionScopes).length > 0) {
++            const response = yield this.request({ method: "wallet_revokeSession", params: { scopes } });
++            if (response.error || response.result !== true) {
++              throw new Error(response.error?.message || "Wallet did not acknowledge session revocation");
+             }
+-          );
++          }
+           const remainingScopesIncludeEip155 = remainingScopes.some(
+             (scope) => scope.includes("eip155")
+           );
+           if (!remainingScopesIncludeEip155) {
+-            this.kvstore.delete(ACCOUNTS_STORE_KEY);
+-            this.kvstore.delete(CHAIN_STORE_KEY);
++            yield this.kvstore.delete(ACCOUNTS_STORE_KEY);
++            yield this.kvstore.delete(CHAIN_STORE_KEY);
+           }
+           if (remainingScopes.length > 0) {
+             this.kvstore.set(
+@@ -1503,13 +1502,14 @@
+               })
+             );
+           } else {
+-            this.kvstore.delete(SESSION_STORE_KEY);
++            yield this.kvstore.delete(SESSION_STORE_KEY);
+             if (typeof window !== "undefined" && typeof window.removeEventListener !== "undefined" && this.windowFocusHandler) {
+               window.removeEventListener("focus", this.windowFocusHandler);
+               this.windowFocusHandler = void 0;
+             }
+             yield this.dappClient.disconnect();
+           }
++          yield this.removeStoredPendingSessionRequest();
+           this.notifyCallbacks({
+             method: "wallet_sessionChanged",
+             params: {
+@@ -1598,7 +1598,7 @@
+       }
+       storeWalletSession(request, response) {
+         return __async(this, null, function* () {
+-          if (response.error) {
++          if (response.error || (CACHED_RESET_METHOD_LIST.includes(request.method) && response.result !== true)) {
+             return;
+           }
+           if (CACHED_METHOD_LIST.includes(request.method)) {
+@@ -3743,8 +3743,9 @@
+ };
+ headlessConnect_fn = function(scopes, caipAccountIds, sessionProperties) {
+   return __async(this, null, function* () {
+-    if (this.dappClient.state === "CONNECTED" || this.dappClient.state === "CONNECTING") {
+-      yield this.dappClient.disconnect().catch(() => void 0);
++    const dappClient = this.dappClient;
++    if (dappClient.state === "CONNECTED" || dappClient.state === "CONNECTING") {
++      yield dappClient.disconnect().catch(() => void 0);
+     }
+     const onSessionRequest = (sessionRequest) => {
+       const connectionRequest = {
+@@ -3754,7 +3755,7 @@
+       const deeplink = this.options.ui.factory.createConnectionDeeplink(connectionRequest);
+       this.emit("display_uri", deeplink);
+     };
+-    this.dappClient.on("session_request", onSessionRequest);
++    dappClient.on("session_request", onSessionRequest);
+     try {
+       yield __privateMethod(this, _MetaMaskConnectMultichain_instances, transportOrThrow_fn).call(this).connect({
+         scopes,
+@@ -3772,7 +3773,7 @@
+       }
+       throw new Error(String(error));
+     } finally {
+-      this.dappClient.off("session_request", onSessionRequest);
++      dappClient.off("session_request", onSessionRequest);
+     }
+   });
+ };
+diff --git a/dist/react-native/es/connect-multichain.mjs b/dist/react-native/es/connect-multichain.mjs
+--- a/dist/react-native/es/connect-multichain.mjs
++++ b/dist/react-native/es/connect-multichain.mjs
+@@ -1211,7 +1211,7 @@
+     init_constants2();
+     DEFAULT_REQUEST_TIMEOUT2 = 60 * 1e3;
+     CONNECTION_GRACE_PERIOD = 60 * 1e3;
+-    DEFAULT_CONNECTION_TIMEOUT = DEFAULT_REQUEST_TIMEOUT2 + CONNECTION_GRACE_PERIOD;
++    DEFAULT_CONNECTION_TIMEOUT = 5 * 60 * 1e3 + CONNECTION_GRACE_PERIOD;
+     DEFAULT_RESUME_TIMEOUT = 10 * 1e3;
+     SESSION_STORE_KEY = "cache_wallet_getSession";
+     ACCOUNTS_STORE_KEY = "cache_eth_accounts";
+@@ -1441,9 +1441,7 @@
+           return connection.catch((error) => __async(this, null, function* () {
+             yield this.dappClient.disconnect();
+             throw error;
+-          })).finally(() => {
+-            this.removeStoredPendingSessionRequest();
+-          });
++          })).finally(() => this.removeStoredPendingSessionRequest());
+         });
+       }
+       /**
+@@ -1465,17 +1463,18 @@
+               ([key]) => remainingScopes.includes(key)
+             )
+           );
+-          this.request({ method: "wallet_revokeSession", params: { scopes } }).catch(
+-            (err) => {
+-              console.error("error revoking session", err);
++          if (Object.keys(cachedSessionScopes).length > 0) {
++            const response = yield this.request({ method: "wallet_revokeSession", params: { scopes } });
++            if (response.error || response.result !== true) {
++              throw new Error(response.error?.message || "Wallet did not acknowledge session revocation");
+             }
+-          );
++          }
+           const remainingScopesIncludeEip155 = remainingScopes.some(
+             (scope) => scope.includes("eip155")
+           );
+           if (!remainingScopesIncludeEip155) {
+-            this.kvstore.delete(ACCOUNTS_STORE_KEY);
+-            this.kvstore.delete(CHAIN_STORE_KEY);
++            yield this.kvstore.delete(ACCOUNTS_STORE_KEY);
++            yield this.kvstore.delete(CHAIN_STORE_KEY);
+           }
+           if (remainingScopes.length > 0) {
+             this.kvstore.set(
+@@ -1487,13 +1486,14 @@
+               })
+             );
+           } else {
+-            this.kvstore.delete(SESSION_STORE_KEY);
++            yield this.kvstore.delete(SESSION_STORE_KEY);
+             if (typeof window !== "undefined" && typeof window.removeEventListener !== "undefined" && this.windowFocusHandler) {
+               window.removeEventListener("focus", this.windowFocusHandler);
+               this.windowFocusHandler = void 0;
+             }
+             yield this.dappClient.disconnect();
+           }
++          yield this.removeStoredPendingSessionRequest();
+           this.notifyCallbacks({
+             method: "wallet_sessionChanged",
+             params: {
+@@ -1582,7 +1582,7 @@
+       }
+       storeWalletSession(request, response) {
+         return __async(this, null, function* () {
+-          if (response.error) {
++          if (response.error || (CACHED_RESET_METHOD_LIST.includes(request.method) && response.result !== true)) {
+             return;
+           }
+           if (CACHED_METHOD_LIST.includes(request.method)) {
+@@ -3666,8 +3666,9 @@
+ };
+ headlessConnect_fn = function(scopes, caipAccountIds, sessionProperties) {
+   return __async(this, null, function* () {
+-    if (this.dappClient.state === "CONNECTED" || this.dappClient.state === "CONNECTING") {
+-      yield this.dappClient.disconnect().catch(() => void 0);
++    const dappClient = this.dappClient;
++    if (dappClient.state === "CONNECTED" || dappClient.state === "CONNECTING") {
++      yield dappClient.disconnect().catch(() => void 0);
+     }
+     const onSessionRequest = (sessionRequest) => {
+       const connectionRequest = {
+@@ -3677,7 +3678,7 @@
+       const deeplink = this.options.ui.factory.createConnectionDeeplink(connectionRequest);
+       this.emit("display_uri", deeplink);
+     };
+-    this.dappClient.on("session_request", onSessionRequest);
++    dappClient.on("session_request", onSessionRequest);
+     try {
+       yield __privateMethod(this, _MetaMaskConnectMultichain_instances, transportOrThrow_fn).call(this).connect({
+         scopes,
+@@ -3695,7 +3696,7 @@
+       }
+       throw new Error(String(error));
+     } finally {
+-      this.dappClient.off("session_request", onSessionRequest);
++      dappClient.off("session_request", onSessionRequest);
+     }
+   });
+ };

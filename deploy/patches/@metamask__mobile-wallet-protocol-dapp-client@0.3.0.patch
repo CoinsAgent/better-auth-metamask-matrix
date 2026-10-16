@@ -1,0 +1,251 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+deleted file mode 100644
+index 7540cabde5c019a38ce154ebff449db7386d5d45..0000000000000000000000000000000000000000
+diff --git a/dist/index.js b/dist/index.js
+index 96849d2a23da1b23738ea37dc60feab0be5a4612..2d9ccb671f3c3ab7a598efbb72b73f357ef8cd1f 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -24,8 +24,11 @@ var TrustedConnectionHandler = class {
+    */
+   async execute(session, request) {
+     await this.context.transport.connect();
++    if (this.context.session?.id !== session.id) throw new Error("Wallet connection cancelled.");
+     await this.context.transport.subscribe(request.channel);
++    if (this.context.session?.id !== session.id) throw new Error("Wallet connection cancelled.");
+     const offer = await this._waitForHandshakeOffer(request.expiresAt);
++    if (this.context.session?.id !== session.id) throw new Error("Wallet connection cancelled.");
+     const finalSession = this._createFinalSession(session, offer);
+     this.context.session = finalSession;
+     await this._finalizeConnection(finalSession, request);
+@@ -44,19 +47,19 @@ var TrustedConnectionHandler = class {
+    */
+   _waitForHandshakeOffer(requestExpiry) {
+     return new Promise((resolve, reject) => {
+-      if (requestExpiry < Date.now()) {
+-        return reject(new (0, _mobilewalletprotocolcore.SessionError)(_mobilewalletprotocolcore.ErrorCode.REQUEST_EXPIRED, "Session request expired before wallet could connect"));
+-      }
+-      const timeoutDuration = requestExpiry + HANDSHAKE_TIMEOUT - Date.now();
+-      const timeoutId = setTimeout(() => {
+-        this.context.off("handshake_offer_received", onOfferReceived);
+-        reject(new (0, _mobilewalletprotocolcore.SessionError)(_mobilewalletprotocolcore.ErrorCode.REQUEST_EXPIRED, "Did not receive handshake offer from wallet in time."));
+-      }, timeoutDuration);
+-      const onOfferReceived = (payload) => {
++      let timeoutId;
++      const cleanup = () => {
+         clearTimeout(timeoutId);
+-        resolve(payload);
++        this.context.off("handshake_offer_received", onOfferReceived);
++        this.context.off("disconnected", onDisconnected);
+       };
++      const onOfferReceived = (payload) => { cleanup(); resolve(payload); };
++      const onDisconnected = () => { cleanup(); reject(new Error("Wallet connection cancelled.")); };
++      const duration = requestExpiry + HANDSHAKE_TIMEOUT - Date.now();
++      if (duration <= 0) return reject(new (0, _mobilewalletprotocolcore.SessionError)(_mobilewalletprotocolcore.ErrorCode.REQUEST_EXPIRED, "Session request expired before wallet could connect"));
++      timeoutId = setTimeout(() => { cleanup(); reject(new (0, _mobilewalletprotocolcore.SessionError)(_mobilewalletprotocolcore.ErrorCode.REQUEST_EXPIRED, "Session request expired before wallet could connect")); }, duration);
+       this.context.once("handshake_offer_received", onOfferReceived);
++      this.context.once("disconnected", onDisconnected);
+     });
+   }
+   /**
+@@ -108,8 +111,11 @@ var UntrustedConnectionHandler = (_class = class {
+    */
+   async execute(session, request) {
+     await this.context.transport.connect();
++    if (this.context.session?.id !== session.id) throw new Error("Wallet connection cancelled.");
+     await this.context.transport.subscribe(request.channel);
++    if (this.context.session?.id !== session.id) throw new Error("Wallet connection cancelled.");
+     const offer = await this._waitForHandshakeOffer(request.expiresAt);
++    if (this.context.session?.id !== session.id) throw new Error("Wallet connection cancelled.");
+     await this._handleOtpInput(offer);
+     const finalSession = this._createFinalSession(session, offer);
+     this.context.session = finalSession;
+@@ -125,20 +131,19 @@ var UntrustedConnectionHandler = (_class = class {
+    */
+   _waitForHandshakeOffer(requestExpiry) {
+     return new Promise((resolve, reject) => {
+-      const timeoutDuration = requestExpiry - Date.now();
+-      if (timeoutDuration <= 0) {
+-        return reject(new (0, _mobilewalletprotocolcore.SessionError)(_mobilewalletprotocolcore.ErrorCode.REQUEST_EXPIRED, "Session request expired before wallet could connect."));
+-      }
+-      this.timeoutId = setTimeout(() => {
++      let timeoutId;
++      const cleanup = () => {
++        clearTimeout(timeoutId);
+         this.context.off("handshake_offer_received", onOfferReceived);
+-        reject(new (0, _mobilewalletprotocolcore.SessionError)(_mobilewalletprotocolcore.ErrorCode.REQUEST_EXPIRED, "Did not receive handshake offer from wallet in time."));
+-      }, timeoutDuration);
+-      const onOfferReceived = (payload) => {
+-        if (this.timeoutId) clearTimeout(this.timeoutId);
+-        this.timeoutId = null;
+-        resolve(payload);
++        this.context.off("disconnected", onDisconnected);
+       };
++      const onOfferReceived = (payload) => { cleanup(); resolve(payload); };
++      const onDisconnected = () => { cleanup(); reject(new Error("Wallet connection cancelled.")); };
++      const duration = requestExpiry - Date.now();
++      if (duration <= 0) return reject(new (0, _mobilewalletprotocolcore.SessionError)(_mobilewalletprotocolcore.ErrorCode.REQUEST_EXPIRED, "Session request expired before wallet could connect"));
++      timeoutId = setTimeout(() => { cleanup(); reject(new (0, _mobilewalletprotocolcore.SessionError)(_mobilewalletprotocolcore.ErrorCode.REQUEST_EXPIRED, "Session request expired before wallet could connect")); }, duration);
+       this.context.once("handshake_offer_received", onOfferReceived);
++      this.context.once("disconnected", onDisconnected);
+     });
+   }
+   /**
+@@ -216,7 +221,7 @@ var UntrustedConnectionHandler = (_class = class {
+ }, _class);
+ 
+ // src/client.ts
+-var SESSION_REQUEST_TTL = 60 * 1e3;
++var SESSION_REQUEST_TTL = 5 * 60 * 1e3;
+ var HANDSHAKE_TIMEOUT = 60 * 1e3;
+ var DappClient = class extends _mobilewalletprotocolcore.BaseClient {
+   // biome-ignore lint/suspicious/noExplicitAny: used for event emitter
+@@ -276,12 +281,22 @@ var DappClient = class extends _mobilewalletprotocolcore.BaseClient {
+       sendMessage: this.sendMessage.bind(this)
+     };
+     const handler = mode === "trusted" ? new TrustedConnectionHandler(context) : new UntrustedConnectionHandler(context);
++    let onDisconnected;
++    const cancelled = new Promise((_, reject) => {
++      onDisconnected = () => reject(new Error("Wallet connection cancelled."));
++      this.once("disconnected", onDisconnected);
++    });
+     try {
+-      await handler.execute(pendingSession, request);
++      await Promise.race([handler.execute(pendingSession, request), cancelled]);
+     } catch (error) {
+-      this.emit("error", error);
+-      await this.disconnect();
++      // A cancelled attempt must never close or mutate a later session.
++      if (this.session?.id === pendingSession.id) {
++        this.emit("error", error);
++        await this.disconnect();
++      }
+       throw error;
++    } finally {
++      this.off("disconnected", onDisconnected);
+     }
+   }
+   /**
+diff --git a/dist/index.mjs b/dist/index.mjs
+index e64daf1add841436065d5b7bb32aaf5f155a98c7..97adb1b7d7ff3a6569f6e617f7e7e0f2c85437c6 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -24,8 +24,11 @@ var TrustedConnectionHandler = class {
+    */
+   async execute(session, request) {
+     await this.context.transport.connect();
++    if (this.context.session?.id !== session.id) throw new Error("Wallet connection cancelled.");
+     await this.context.transport.subscribe(request.channel);
++    if (this.context.session?.id !== session.id) throw new Error("Wallet connection cancelled.");
+     const offer = await this._waitForHandshakeOffer(request.expiresAt);
++    if (this.context.session?.id !== session.id) throw new Error("Wallet connection cancelled.");
+     const finalSession = this._createFinalSession(session, offer);
+     this.context.session = finalSession;
+     await this._finalizeConnection(finalSession, request);
+@@ -44,19 +47,19 @@ var TrustedConnectionHandler = class {
+    */
+   _waitForHandshakeOffer(requestExpiry) {
+     return new Promise((resolve, reject) => {
+-      if (requestExpiry < Date.now()) {
+-        return reject(new SessionError(ErrorCode.REQUEST_EXPIRED, "Session request expired before wallet could connect"));
+-      }
+-      const timeoutDuration = requestExpiry + HANDSHAKE_TIMEOUT - Date.now();
+-      const timeoutId = setTimeout(() => {
+-        this.context.off("handshake_offer_received", onOfferReceived);
+-        reject(new SessionError(ErrorCode.REQUEST_EXPIRED, "Did not receive handshake offer from wallet in time."));
+-      }, timeoutDuration);
+-      const onOfferReceived = (payload) => {
++      let timeoutId;
++      const cleanup = () => {
+         clearTimeout(timeoutId);
+-        resolve(payload);
++        this.context.off("handshake_offer_received", onOfferReceived);
++        this.context.off("disconnected", onDisconnected);
+       };
++      const onOfferReceived = (payload) => { cleanup(); resolve(payload); };
++      const onDisconnected = () => { cleanup(); reject(new Error("Wallet connection cancelled.")); };
++      const duration = requestExpiry + HANDSHAKE_TIMEOUT - Date.now();
++      if (duration <= 0) return reject(new SessionError(ErrorCode.REQUEST_EXPIRED, "Session request expired before wallet could connect"));
++      timeoutId = setTimeout(() => { cleanup(); reject(new SessionError(ErrorCode.REQUEST_EXPIRED, "Session request expired before wallet could connect")); }, duration);
+       this.context.once("handshake_offer_received", onOfferReceived);
++      this.context.once("disconnected", onDisconnected);
+     });
+   }
+   /**
+@@ -108,8 +111,11 @@ var UntrustedConnectionHandler = class {
+    */
+   async execute(session, request) {
+     await this.context.transport.connect();
++    if (this.context.session?.id !== session.id) throw new Error("Wallet connection cancelled.");
+     await this.context.transport.subscribe(request.channel);
++    if (this.context.session?.id !== session.id) throw new Error("Wallet connection cancelled.");
+     const offer = await this._waitForHandshakeOffer(request.expiresAt);
++    if (this.context.session?.id !== session.id) throw new Error("Wallet connection cancelled.");
+     await this._handleOtpInput(offer);
+     const finalSession = this._createFinalSession(session, offer);
+     this.context.session = finalSession;
+@@ -125,20 +131,19 @@ var UntrustedConnectionHandler = class {
+    */
+   _waitForHandshakeOffer(requestExpiry) {
+     return new Promise((resolve, reject) => {
+-      const timeoutDuration = requestExpiry - Date.now();
+-      if (timeoutDuration <= 0) {
+-        return reject(new SessionError2(ErrorCode2.REQUEST_EXPIRED, "Session request expired before wallet could connect."));
+-      }
+-      this.timeoutId = setTimeout(() => {
++      let timeoutId;
++      const cleanup = () => {
++        clearTimeout(timeoutId);
+         this.context.off("handshake_offer_received", onOfferReceived);
+-        reject(new SessionError2(ErrorCode2.REQUEST_EXPIRED, "Did not receive handshake offer from wallet in time."));
+-      }, timeoutDuration);
+-      const onOfferReceived = (payload) => {
+-        if (this.timeoutId) clearTimeout(this.timeoutId);
+-        this.timeoutId = null;
+-        resolve(payload);
++        this.context.off("disconnected", onDisconnected);
+       };
++      const onOfferReceived = (payload) => { cleanup(); resolve(payload); };
++      const onDisconnected = () => { cleanup(); reject(new Error("Wallet connection cancelled.")); };
++      const duration = requestExpiry - Date.now();
++      if (duration <= 0) return reject(new SessionError2(ErrorCode2.REQUEST_EXPIRED, "Session request expired before wallet could connect"));
++      timeoutId = setTimeout(() => { cleanup(); reject(new SessionError2(ErrorCode2.REQUEST_EXPIRED, "Session request expired before wallet could connect")); }, duration);
+       this.context.once("handshake_offer_received", onOfferReceived);
++      this.context.once("disconnected", onDisconnected);
+     });
+   }
+   /**
+@@ -216,7 +221,7 @@ var UntrustedConnectionHandler = class {
+ };
+ 
+ // src/client.ts
+-var SESSION_REQUEST_TTL = 60 * 1e3;
++var SESSION_REQUEST_TTL = 5 * 60 * 1e3;
+ var HANDSHAKE_TIMEOUT = 60 * 1e3;
+ var DappClient = class extends BaseClient {
+   // biome-ignore lint/suspicious/noExplicitAny: used for event emitter
+@@ -276,12 +281,22 @@ var DappClient = class extends BaseClient {
+       sendMessage: this.sendMessage.bind(this)
+     };
+     const handler = mode === "trusted" ? new TrustedConnectionHandler(context) : new UntrustedConnectionHandler(context);
++    let onDisconnected;
++    const cancelled = new Promise((_, reject) => {
++      onDisconnected = () => reject(new Error("Wallet connection cancelled."));
++      this.once("disconnected", onDisconnected);
++    });
+     try {
+-      await handler.execute(pendingSession, request);
++      await Promise.race([handler.execute(pendingSession, request), cancelled]);
+     } catch (error) {
+-      this.emit("error", error);
+-      await this.disconnect();
++      // A cancelled attempt must never close or mutate a later session.
++      if (this.session?.id === pendingSession.id) {
++        this.emit("error", error);
++        await this.disconnect();
++      }
+       throw error;
++    } finally {
++      this.off("disconnected", onDisconnected);
+     }
+   }
+   /**

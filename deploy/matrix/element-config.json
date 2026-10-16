@@ -1,0 +1,42 @@
+{
+  "default_server_config": {
+    "m.homeserver": {
+      "base_url": "http://localhost:8008",
+      "server_name": "localhost"
+    }
+  },
+  "disable_custom_urls": true,
+  "disable_guests": true,
+  "disable_3pid_login": true,
+  "sso_redirect_options": {
+    "immediate": false,
+    "on_welcome_page": false,
+    "on_login_page": true
+  },
+  "room_directory": {
+    "servers": ["localhost"]
+  },
+  "features": {
+    "feature_video_rooms": false
+  },
+  "default_theme": "light",
+  "show_labs_settings": false,
+  "enable_client_well_known_lookups": false,
+  "disable_login_language_selector": true,
+  "default_federate": false,
+  "brand": "Matrix \u00b7 Wallet login",
+  "branding": {
+    "welcome_background_url": "/wallet-background.svg",
+    "auth_header_logo_url": "/wallet-logo.svg",
+    "logo_link_url": "http://localhost:5173/matrix",
+    "auth_footer_links": [
+      {
+        "text": "Better Auth",
+        "url": "http://localhost:5173/"
+      }
+    ]
+  },
+  "embedded_pages": {
+    "welcome_url": "/wallet-welcome.html"
+  }
+}

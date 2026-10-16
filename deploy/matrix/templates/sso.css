@@ -1,0 +1,76 @@
+:root {
+	font-family: system-ui, sans-serif;
+	color: #292437;
+	background: #faf9fd;
+}
+body {
+	margin: 0;
+	padding: 8vh 20px;
+	font-size: 18px;
+	line-height: 1.65;
+}
+header,
+main,
+footer {
+	box-sizing: border-box;
+	max-width: 600px;
+	margin: auto;
+	padding: 24px;
+}
+header {
+	padding-bottom: 0;
+}
+main {
+	background: white;
+	border: 1px solid #e8e3ef;
+	border-radius: 16px;
+	margin-top: 24px;
+}
+h1 {
+	font-size: 32px;
+	line-height: 1.25;
+}
+h2 {
+	font-size: 25px;
+}
+a {
+	color: #6d28d9;
+	overflow-wrap: anywhere;
+}
+.primary-button,
+input[type="submit"] {
+	display: block;
+	border: 0;
+	border-radius: 8px;
+	padding: 13px 20px;
+	background: #6d28d9;
+	color: white;
+	text-align: center;
+	text-decoration: none;
+	font: inherit;
+}
+input {
+	box-sizing: border-box;
+	max-width: 100%;
+	padding: 12px;
+	font: inherit;
+}
+label {
+	display: block;
+}
+img {
+	max-width: 100%;
+}
+footer {
+	text-align: center;
+	color: #766c83;
+}
+.profile {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+}
+.profile img {
+	width: 48px;
+	border-radius: 50%;
+}

@@ -1,0 +1,17 @@
+# Local credentials and runtime state must never be checked in.
+**/.secret
+**/.env
+**/.env.*
+!**/.env.example
+**/data/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/*.sqlite
+**/*.sqlite-shm
+**/*.sqlite-wal
+/tmp
+
+# Generated application output and dependencies.
+**/node_modules/
+**/dist/

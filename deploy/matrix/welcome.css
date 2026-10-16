@@ -1,0 +1,65 @@
+.mx_Welcome {
+	width: min(620px, calc(100vw - 32px));
+	padding: 32px 24px;
+}
+.mx_WelcomePage {
+	width: 100%;
+	max-width: 520px;
+	font:
+		18px / 1.6 system-ui,
+		sans-serif;
+	text-align: center;
+	color: #292437;
+}
+.mx_WelcomePage h1 {
+	font-size: clamp(28px, 5vw, 34px);
+	line-height: 1.25;
+	margin: 20px 0 16px;
+}
+.mx_WelcomePage p {
+	margin: 0 0 20px;
+}
+.mx_WelcomePage p + p {
+	color: #71677f;
+}
+.mx_WelcomePage img {
+	display: block;
+	width: 56px;
+	height: 56px;
+	margin: 0 auto;
+}
+.mx_WelcomePage a[href="#/start_sso"] {
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	width: 100%;
+	margin: 28px 0 20px;
+	padding: 14px 20px;
+	border-radius: 10px;
+	background: #6d28d9;
+	color: #fff;
+	font-size: 18px;
+	font-weight: 650;
+	line-height: 1.5;
+	text-decoration: none;
+}
+.mx_WelcomePage a[href="#/start_sso"]:hover {
+	background: #5b21b6;
+}
+.mx_WelcomePage a[href="#/start_sso"]:focus-visible {
+	outline: 3px solid #a78bfa;
+	outline-offset: 4px;
+}
+.mx_WelcomePage a img {
+	width: 30px;
+	height: 30px;
+	margin: 0;
+	flex-shrink: 0;
+}
+.mx_WelcomePage a + p {
+	color: #71677f;
+	font-size: 16px;
+	margin-bottom: 0;
+}

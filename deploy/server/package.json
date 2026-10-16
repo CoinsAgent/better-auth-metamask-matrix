@@ -1,0 +1,24 @@
+{
+  "name": "@better-auth-deploy/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-auth": "workspace:*",
+    "better-sqlite3": "^12.10.0",
+    "viem": "^2.57.4",
+    "@better-auth/oauth-provider": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^25.9.3",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.3"
+  }
+}

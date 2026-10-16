@@ -1,0 +1,36 @@
+name: better-auth-matrix
+services:
+  synapse:
+    image: matrixdotorg/synapse:v1.163.0
+    restart: unless-stopped
+    # Linux local demo: localhost is the same issuer inside Synapse and the browser.
+    network_mode: host
+    user: "${MATRIX_UID:-1000}:${MATRIX_GID:-1000}"
+    environment:
+      SYNAPSE_CONFIG_PATH: /data/homeserver.yaml
+    volumes:
+      - ./.runtime/synapse:/data
+      - ./templates:/templates:ro
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8008/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+  element:
+    image: better-auth-element-wallet:local
+    build:
+      context: .
+      dockerfile: Element.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8088:80"
+    volumes:
+      - ./element-config.json:/app/config.json:ro
+      - ./background.svg:/app/wallet-background.svg:ro
+      - ./welcome.html:/app/wallet-welcome.html:ro
+      - ../client/public/reference/client-logo.svg:/app/wallet-logo.svg:ro
+      - ../client/public/metamask-fox.svg:/app/metamask-fox.svg:ro
+    depends_on:
+      synapse:
+        condition: service_healthy

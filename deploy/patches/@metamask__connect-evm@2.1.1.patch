@@ -1,0 +1,36 @@
+diff --git a/dist/browser/es/connect-evm.mjs b/dist/browser/es/connect-evm.mjs
+index e64fb464f339d6c5937140dcc863ba138f718a21..91b17411026e6f1016cde6cd4afe0ed527ac1ff0 100644
+--- a/dist/browser/es/connect-evm.mjs
++++ b/dist/browser/es/connect-evm.mjs
+@@ -884,12 +884,7 @@ var _MetamaskConnectEVM = class _MetamaskConnectEVM {
+     return __async(this, null, function* () {
+       var _a;
+       logger("request: disconnect");
+-      const sessionScopes = __privateGet(this, _sessionScopes);
+-      const eip155Scopes = Object.keys(sessionScopes).filter((scope) => {
+-        const { namespace: namespace2 } = parseScopeString(scope);
+-        return namespace2 === "eip155";
+-      });
+-      yield __privateGet(this, _core2).disconnect(eip155Scopes);
++      yield __privateGet(this, _core2).disconnect();
+       __privateMethod(this, _MetamaskConnectEVM_instances, onDisconnect_fn).call(this);
+       __privateMethod(this, _MetamaskConnectEVM_instances, clearConnectionState_fn).call(this);
+       (_a = __privateGet(this, _removeNotificationHandler)) == null ? void 0 : _a.call(this);
+diff --git a/dist/src/connect.js b/dist/src/connect.js
+index 5adb43d5719e6355cf77fe30e30c9441deb6b50f..16102e4f5eb36d36fabdc317016ceb9e9f5887aa 100644
+--- a/dist/src/connect.js
++++ b/dist/src/connect.js
+@@ -327,12 +327,7 @@ export class MetamaskConnectEVM {
+         return __awaiter(this, void 0, void 0, function* () {
+             var _a;
+             logger('request: disconnect');
+-            const sessionScopes = __classPrivateFieldGet(this, _MetamaskConnectEVM_sessionScopes, "f");
+-            const eip155Scopes = Object.keys(sessionScopes).filter((scope) => {
+-                const { namespace } = parseScopeString(scope);
+-                return namespace === 'eip155';
+-            });
+-            yield __classPrivateFieldGet(this, _MetamaskConnectEVM_core, "f").disconnect(eip155Scopes);
++            yield __classPrivateFieldGet(this, _MetamaskConnectEVM_core, "f").disconnect();
+             __classPrivateFieldGet(this, _MetamaskConnectEVM_instances, "m", _MetamaskConnectEVM_onDisconnect).call(this);
+             __classPrivateFieldGet(this, _MetamaskConnectEVM_instances, "m", _MetamaskConnectEVM_clearConnectionState).call(this);
+             // Note: We intentionally do NOT remove the display_uri and wallet_sessionChanged
